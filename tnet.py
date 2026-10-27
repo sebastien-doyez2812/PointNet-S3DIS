@@ -17,31 +17,27 @@ class Tnet(nn.Module):
         self.batch_norm1 = nn.BatchNorm1d(64)
         self.batch_norm2 = nn.BatchNorm1d(128)
         self.batch_norm3 = nn.BatchNorm1d(256)
-        self.batch_norm4 = nn.BatchNorm1d(256)
-        self.batch_norm5 = nn.BatchNorm1d(128)
+        self.batch_norm4 = nn.BatchNorm1d(128)
+        self.batch_norm5 = nn.BatchNorm1d(64)
 
-        self.fc1 = nn.Linear(256, 256)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, self.output_dim * self.output_dim)
+        self.fc1 = nn.Linear(256, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, self.output_dim * self.output_dim)
         
     def forward(self, x):
-        num_pts = x.shape[1]
+        batch_size = x.shape[0]
 
-        x = x.transpose(2, 1)
         x = F.relu(self.batch_norm1(self.conv1(x)))
         x = F.relu(self.batch_norm2(self.conv2(x)))
         x = F.relu(self.batch_norm3(self.conv3(x)))
 
-        x = nn.MaxPool1d(num_pts)(x)
+        x = torch.max(x, dim=2)[0]
         x = x.view(-1, 256)
 
         x = F.relu(self.batch_norm4(self.fc1(x)))
         x = F.relu(self.batch_norm5(self.fc2(x)))
         x = self.fc3(x)
 
-        identity_matrix = torch.eye(self.output_dim)
-        if torch.cuda.is_available():
-            identity_matrix = identity_matrix.cuda()
+        identity_matrix = torch.eye(self.output_dim, device=x.device).unsqueeze(0).repeat(batch_size, 1, 1) # (B, output_dim, output_dim)
         x = x.view(-1, self.output_dim, self.output_dim) + identity_matrix
-
         return x
